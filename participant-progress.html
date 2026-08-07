@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Progress Skill</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1b1f23;
+    --muted: #57606a;
+    --border: #d0d7de;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --muted: #9198a1;
+      --border: #30363d;
+      --code-bg: #161b22;
+      --link: #4493f8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+  h2 {
+    font-size: 1.35rem;
+    margin-top: 2.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.35rem;
+  }
+  p.lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+  }
+  p, li { color: var(--fg); }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+  }
+  a { color: var(--link); }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin: 0.3rem 0; }
+  .badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.15rem 0.7rem;
+    margin-bottom: 1rem;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<span class="badge">Claude Code skill · read-only · on-demand</span>
+<h1>Participant Progress Skill</h1>
+<p class="lede">An on-demand Claude Code skill for facilitators running hands-on training
+programs. It scans a GitHub org's participant repos and produces a
+facilitator-facing briefing: who's progressing well, who's stuck, and what
+specifically to look at before intervening.</p>
+
+<p>Invoke it by asking Claude Code to check on participants, get a cohort
+progress report, or triage repos before office hours — it's registered as
+the <code>participant-progress</code> skill (<code>~/.claude/skills/participant-progress/</code>).</p>
+
+<h2>What it does</h2>
+<ol>
+  <li>Lists every non-archived repo in a given GitHub org via the <code>gh</code> CLI
+    (read-only — GET requests only, never writes to a participant's repo).</li>
+  <li>Pulls per-repo signals over a time window (default: since the last run
+    for that org, or the last 14 days on a first run).</li>
+  <li>Snapshots the results to disk so the next run can report <em>change</em>
+    (accelerating / flat / declining / stalled) instead of just a static
+    state.</li>
+  <li>Prints one Markdown briefing, ordered by urgency, sized to be read in
+    under a minute.</li>
+</ol>
+
+<h2>Signals collected per repo</h2>
+<ul>
+  <li><strong>Momentum</strong> — commit count and daily cadence over the window, trend vs.
+    the previous window, days since last commit.</li>
+  <li><strong>Working style</strong> — commit size distribution (iterative small commits vs.
+    one big dump), trivial/low-effort commit messages.</li>
+  <li><strong>Struggle markers</strong> — consecutive fix/revert-style commits, failing CI
+    runs and whether failures persist across pushes, force-pushes that follow
+    a multi-day silence.</li>
+  <li><strong>Claude Code usage (bonus signal)</strong> — presence and update frequency of
+    <code>CLAUDE.md</code>, presence of a committed <code>.claude/</code> directory. Never required,
+    never counted against a participant if absent.</li>
+  <li><strong>Structural basics</strong> — README, tests, file count, repo size.</li>
+</ul>
+
+<h2>Report format</h2>
+<p>One section per participant, most-urgent first:</p>
+<ol>
+  <li><strong>Status line</strong> — On track / Watch / Needs intervention.</li>
+  <li><strong>Evidence</strong> — 2-4 concrete bullets pulled from the signals above (e.g.
+    "No commits in 9 days — prior window averaged ~1/day"), not a restated
+    score. Participants who are On track get a single line, no bullet list.</li>
+  <li><strong>Suggested angle for intervention</strong> — one actionable line, only for
+    Watch / Needs intervention.</li>
+</ol>
+<p>The report closes with a footer: repos scanned/skipped, the window used,
+and a standing reminder to tell participants their repos are monitored for
+progress support (the tool surfaces this reminder — it does not send any
+notice itself; that's on the facilitator to communicate out of band).</p>
+
+<h2>Config needed at invocation time</h2>
+<ul>
+  <li><strong>GitHub org name</strong> (required) — the skill asks if not given, or offers
+    <code>gh org list</code> to pick from.</li>
+  <li><strong>Roster file</strong> (optional) — a JSON file mapping GitHub login → display
+    name, e.g. <code>{"jsmith42": "Jane Smith"}</code>. Without one, the report uses raw
+    GitHub handles.</li>
+  <li><strong>Window</strong> (optional) — defaults as described above; override with a date
+    range if you want something other than "since last run."</li>
+</ul>
+<p>Repo → participant mapping: every repo in the org is treated as one
+participant unit, identified by repo name (with a best-effort GitHub handle
+guess from the most frequent commit author in the window).</p>
+
+<h2>Explicitly out of scope (v1)</h2>
+<ul>
+  <li>No scheduling, cron, or background execution — on-demand only.</li>
+  <li>No Slack, email, or push notifications.</li>
+  <li>No dashboard or web UI.</li>
+  <li>No write access to participant repos, ever.</li>
+</ul>
+
+<h2>Under the hood</h2>
+<ul>
+  <li><code>~/.claude/skills/participant-progress/SKILL.md</code> — orchestration and
+    report-writing instructions for Claude.</li>
+  <li><code>~/.claude/skills/participant-progress/scripts/scan.py</code> — the data
+    collector. Pure Python 3.6+ standard library, shells out to <code>gh api</code> /
+    <code>gh repo list</code>. Prints one JSON report to stdout and writes timestamped
+    snapshots plus a <code>latest.json</code> under
+    <code>~/.claude/skills/participant-progress/data/&lt;org&gt;/</code>.</li>
+</ul>
+<p>Requires the <code>gh</code> CLI installed and authenticated (<code>gh auth login</code>) with at
+least <code>read:org</code> and <code>repo</code> scope.</p>
+
+</main>
+</body>
+</html>
