@@ -4,77 +4,77 @@
 # Fill blank handles with: python3 .claude/skills/participant-progress/scripts/fill_handles.py
 # Add a row to track a repo; delete a row to stop tracking it.
 repo,participant,github handle
-S2P-Alistair-Maxwell,Alistair Maxwell,
-s2p-amit-bhana,Amit Bhana,
-s2p-andre-vermeulen,Andre Vermeulen,
-s2p-andries-vandenberg,Andries van den Berg,
-s2p-anna-retief,Anna Retief,
-s2p-annelie-coetzee,Annelie Coetzee,
-s2p-anthony-munyare,Anthony Munyare,
-s2p-astrid-rabey,Astrid Rabey,
-s2p-bhavin-lala,Bhavin Lala,
-S2P-Bhavya-Day,Bhavya Day,
-s2p-Blesing_Wk2,Blessing Ntiwane,
-s2p-byron-williams,Byron Williams,
-s2p-carel-vdMerwe,Carel van der Merwe,
-s2p-carike-nel,Carike Nel,
-s2p-carmen-whateley,Carmen Whateley,
-s2p-charlotte-koch,Charlotte Koch,
-s2p-claudia-frowein,Claudia Frowein,
-s2p-damien-turner,Damien Turner,
-s2p-denisha-prag,Denisha Prag,
-s2p-denzil-pillay,Denzil Pillay,
-s2p-derek-schraader,Derek Schraader,
-S2P-Devan-Gounder,Devan Gounder,
-s2p-donna-mcdonald,Donna Mcdonald,
-s2p-dustin-fransman,Dustin Fransman,
-S2P-Ernst-Swanepoel,Ernst Swanepoel,
-s2p-gerhard-vandermerwe,Gerhard van der Merwe,
-s2p-hannah-marais,Hannah Marais,
-s2p-haydn-fensham,Haydn Fensham,
-s2p-henk-van-huyssteen,Henk van Huyssteen,
-s2p-john-bussio,John Bussio,
-s2p-Jono-Maxwell,Jono Maxwell,
-s2p-kolawole-soremekun,Kolawole Soremekun,
-s2p-lauren-lanz,Lauren Lanz,
-s2p-leon-oheneadu,Leon Oheneadu,
-s2p-lilienne-vdmerwe,Lilienne van der Merwe,
-s2p-Lungile-Mahluza,Lungile Mahluza,
-s2p-lutho-sotashe,Lutho Sotashe,
-s2p-mohammed-shaikh,Mohammed Shaikh,
-s2p-monique-dewaal,Monique Dewaal,
-s2p-mosa-nyamande,Mosa Nyamande,
-s2p-muhammed-ebrahim,Muhammed Ebrahim,
-s2p-MyWordsmith,Abayomi Aina,
-s2p-nemita-mithal1,Nemita Mithal,
-S2P-neville-hounsom,Neville Hounsom,
-s2p-nomsa-makhetha,Nomsa Makhetha,
-s2p-olivier-grandjean,Olivier Grandjean,
-s2p-Paul-Lingenfelder,Paul Lingenfelder,
-s2p-pete-sampey,Pete Sampey,
-s2p-peter-gladysek,Peter Gladysek,
-s2p-pieter-vanniekerk,Pieter van Niekerk,
-s2p-previn-pillay,Previn Pillay,
-s2p-rhyno-jacobs,Rhyno Jacobs,
-s2p-rinae-nnduvheni,Rinae Nnduvheni,
-s2p-robert-loubser,Robert Loubser,
-s2p-ruanne-sandrock,Ruanne Sandrock,
-s2p-ryan-norris,Ryan Norris,
-s2p-ryan-subotzky,Ryan Subotzky,
-s2p-siliziwe-mafika,Siliziwe Mafika,
-s2p-Simon-VanWyk,Simon van Wyk,
-s2p-siseko-zibi,Siseko Zibi,
-s2p-sphe-msane,Sphe Msane,
-S2P-Strini-Perumal,Strini Perumal,
-s2p-su-pakkiri,Su Pakkiri,
-s2p-thirusha-chetty,Thirusha Chetty,
-s2p-tolulope-fashanu,Tolulope Fashanu,
-S2P-Trevor-Gumbie,Trevor Gumbie,
-S2P-Tsholo-Masakale,Tsholo Masakale,
-s2p-vusani-tyamzashe,Vusani Tyamzashe,
-s2p-wendy-pienaar,Wendy Pienaar,
-s2p-Wessel-Oosthuizen,Wessel Oosthuizen,
-s2p-yura-kaliazin,Yura Kaliazin,
-s2p-Zak-vonGordon,Zak von Gordon,
-s2p-zante-kilian,Zante Kilian,
-stp-pj-smit,PJ Smit,
+S2P-Alistair-Maxwell,Alistair Maxwell,alistairdmaxwell-cloud
+s2p-amit-bhana,Amit Bhana,amitbhana
+s2p-andre-vermeulen,Andre Vermeulen,andrenaleen
+s2p-andries-vandenberg,Andries van den Berg,rooirobot
+s2p-anna-retief,Anna Retief,annaretief-sa
+s2p-annelie-coetzee,Annelie Coetzee,acoetzeect
+s2p-anthony-munyare,Anthony Munyare,amunyare
+s2p-astrid-rabey,Astrid Rabey,AstridR82
+s2p-bhavin-lala,Bhavin Lala,dhashpl
+S2P-Bhavya-Day,Bhavya Day,bhavs-ai
+s2p-Blesing_Wk2,Blessing Ntiwane,BlessingO
+s2p-byron-williams,Byron Williams,Byron903
+s2p-carel-vdMerwe,Carel van der Merwe,pcvdm15
+s2p-carike-nel,Carike Nel,CarikeNel
+s2p-carmen-whateley,Carmen Whateley,Tutancarmen
+s2p-charlotte-koch,Charlotte Koch,lottierawlinson-code
+s2p-claudia-frowein,Claudia Frowein,ClaudiaFrowein
+s2p-damien-turner,Damien Turner,DamienTurnerZA
+s2p-denisha-prag,Denisha Prag,denishaprag
+s2p-denzil-pillay,Denzil Pillay,DenzilPillay
+s2p-derek-schraader,Derek Schraader,dschraader
+S2P-Devan-Gounder,Devan Gounder,DevGounder
+s2p-donna-mcdonald,Donna Mcdonald,donaghmcd-lgtm
+s2p-dustin-fransman,Dustin Fransman,dfransman-cyber
+S2P-Ernst-Swanepoel,Ernst Swanepoel,eswanepoel-AI
+s2p-gerhard-vandermerwe,Gerhard van der Merwe,Gerhardcvdm
+s2p-hannah-marais,Hannah Marais,HannahMay83
+s2p-haydn-fensham,Haydn Fensham,haydsfen
+s2p-henk-van-huyssteen,Henk van Huyssteen,hvanhuyssteen
+s2p-john-bussio,John Bussio,johnbussio-VSCODE
+s2p-Jono-Maxwell,Jono Maxwell,JD-Maxwell
+s2p-kolawole-soremekun,Kolawole Soremekun,Kolawole-Soremekun
+s2p-lauren-lanz,Lauren Lanz,LaurenLanz87
+s2p-leon-oheneadu,Leon Oheneadu,LeonOhene-Adu
+s2p-lilienne-vdmerwe,Lilienne van der Merwe,liliennevdM
+s2p-Lungile-Mahluza,Lungile Mahluza,mahluza-l
+s2p-lutho-sotashe,Lutho Sotashe,lsotashe
+s2p-mohammed-shaikh,Mohammed Shaikh,mohammedyacoobshaikh
+s2p-monique-dewaal,Monique Dewaal,moniquedewaal
+s2p-mosa-nyamande,Mosa Nyamande,mnyamande
+s2p-muhammed-ebrahim,Muhammed Ebrahim,MuhammedEbrahim1
+s2p-MyWordsmith,Abayomi Aina,MyWordsmith
+s2p-nemita-mithal1,Nemita Mithal,nemita54
+S2P-neville-hounsom,Neville Hounsom,nhounsom
+s2p-nomsa-makhetha,Nomsa Makhetha,NomsaMakhetha
+s2p-olivier-grandjean,Olivier Grandjean,oliviergrandjean-arch
+s2p-Paul-Lingenfelder,Paul Lingenfelder,plingenfelder
+s2p-pete-sampey,Pete Sampey,petesampey-uk
+s2p-peter-gladysek,Peter Gladysek,Cpl-Pnshmnt
+s2p-pieter-vanniekerk,Pieter van Niekerk,PietervNiekerk
+s2p-previn-pillay,Previn Pillay,previndotpillay-collab
+s2p-rhyno-jacobs,Rhyno Jacobs,renosterjacobs
+s2p-rinae-nnduvheni,Rinae Nnduvheni,rnnduvheni
+s2p-robert-loubser,Robert Loubser,robertloubser04
+s2p-ruanne-sandrock,Ruanne Sandrock,ruanne101
+s2p-ryan-norris,Ryan Norris,norriry
+s2p-ryan-subotzky,Ryan Subotzky,RyanSu73
+s2p-siliziwe-mafika,Siliziwe Mafika,SMafika
+s2p-Simon-VanWyk,Simon van Wyk,CycedOut
+s2p-siseko-zibi,Siseko Zibi,SisekoZibi
+s2p-sphe-msane,Sphe Msane,SpheMsane
+S2P-Strini-Perumal,Strini Perumal,strini747-alt
+s2p-su-pakkiri,Su Pakkiri,supakkiri
+s2p-thirusha-chetty,Thirusha Chetty,thirushachetty-code
+s2p-tolulope-fashanu,Tolulope Fashanu,mishaelfash
+S2P-Trevor-Gumbie,Trevor Gumbie,trevorgumbie-cmyk
+S2P-Tsholo-Masakale,Tsholo Masakale,TsholoSaks
+s2p-vusani-tyamzashe,Vusani Tyamzashe,tyamzashev
+s2p-wendy-pienaar,Wendy Pienaar,wendypienaar
+s2p-Wessel-Oosthuizen,Wessel Oosthuizen,WesselO
+s2p-yura-kaliazin,Yura Kaliazin,YuraK-81
+s2p-Zak-vonGordon,Zak von Gordon,Z-von-G
+s2p-zante-kilian,Zante Kilian,kilianjohann
+stp-pj-smit,PJ Smit,pjsmit1983
