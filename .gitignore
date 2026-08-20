@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+
+# Local scan state: participant activity data, not source
+.claude/skills/participant-progress/data/*
+!.claude/skills/participant-progress/data/.gitkeep
+
+# Generated reports
+cohort-*.md
+cohort-*.html
+report.json

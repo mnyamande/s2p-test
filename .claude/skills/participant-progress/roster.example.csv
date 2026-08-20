@@ -1,0 +1,7 @@
+# Optional. Only needed for repos whose names don't follow the s2p-firstname-lastname
+# convention, or when you want real names instead of GitHub handles.
+# Columns are matched case-insensitively; any of repo / participant / github handle work.
+repo,participant,github handle
+s2p-jane-smith,Jane Smith,jsmith42
+cohort-project-alpha,Ade Okafor,adeokafor
+legacy-sandbox-repo,Marta Ruiz,mruiz

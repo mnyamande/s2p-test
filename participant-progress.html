@@ -62,6 +62,16 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.9em;
   }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
   a { color: var(--link); }
   ul, ol { padding-left: 1.4rem; }
   li { margin: 0.3rem 0; }
@@ -87,87 +97,108 @@ programs. It scans a GitHub org's participant repos and produces a
 facilitator-facing briefing: who's progressing well, who's stuck, and what
 specifically to look at before intervening.</p>
 
-<p>Invoke it by asking Claude Code to check on participants, get a cohort
-progress report, or triage repos before office hours — it's registered as
-the <code>participant-progress</code> skill (<code>~/.claude/skills/participant-progress/</code>).</p>
+<p>Invoke it by asking Claude Code for a cohort progress report, who's gone
+quiet, or a repo triage before office hours &mdash; it's registered as the
+<code>participant-progress</code> skill in
+<code>.claude/skills/participant-progress/</code>.</p>
 
 <h2>What it does</h2>
 <ol>
-  <li>Lists every non-archived repo in a given GitHub org via the <code>gh</code> CLI
-    (read-only — GET requests only, never writes to a participant's repo).</li>
-  <li>Pulls per-repo signals over a time window (default: since the last run
-    for that org, or the last 14 days on a first run).</li>
-  <li>Snapshots the results to disk so the next run can report <em>change</em>
-    (accelerating / flat / declining / stalled) instead of just a static
-    state.</li>
-  <li>Prints one Markdown briefing, ordered by urgency, sized to be read in
-    under a minute.</li>
+  <li>Lists every non-archived, non-fork repo in a GitHub org &mdash; read-only,
+      every call is a GET, and nothing is ever written to a participant's repo.</li>
+  <li>Pulls per-repo signals over a time window (default: since the last run for
+      that org, else the last 14 days).</li>
+  <li>Snapshots the results to disk so the next run reports <em>change</em>
+      (&ldquo;no new commits since the last scan&rdquo;) rather than a static picture.</li>
+  <li>Writes the briefing as Markdown and as a self-contained HTML page, ordered
+      by urgency and sized to read in under a minute.</li>
 </ol>
 
-<h2>Signals collected per repo</h2>
+<h2>Quick start</h2>
+<pre><code>cd .claude/skills/participant-progress/scripts
+
+python3 scan.py --org agentic-ai-coop \
+  --roster ../roster.csv \
+  --md /tmp/cohort.md --html /tmp/cohort.html</code></pre>
+<p>With no <code>--md</code>/<code>--html</code>/<code>--out</code>, the Markdown
+briefing prints to stdout. <code>python3 scan.py --help</code> lists every flag.</p>
+<p><strong>Auth:</strong> prefers the <code>gh</code> CLI when it's installed and
+<code>gh auth status</code> passes, so there's no token to manage. Falls back to
+<code>GH_TOKEN</code> / <code>GITHUB_TOKEN</code> when <code>gh</code> isn't
+available. Needs read access to the org.</p>
+
+<h2>Repo &rarr; participant mapping</h2>
+<p>In priority order:</p>
+<ol>
+  <li><strong>Roster file</strong> (<code>--roster</code>, CSV or JSON) &mdash; for
+      repos that break the convention, and for mapping handles to real names.
+      See <code>roster.example.csv</code>.</li>
+  <li><strong>Naming convention</strong> (<code>--pattern</code>, default
+      <code>s2p-{participant}</code>) &mdash; <code>s2p-jane-smith</code> becomes
+      &ldquo;Jane Smith&rdquo;.</li>
+  <li><strong>Fallback</strong> &mdash; the repo name is used as the label and the
+      repo is listed under &ldquo;Name inferred from repo&rdquo; in the report so the
+      roster can be fixed. Nothing is silently dropped.</li>
+</ol>
+
+<h2>Signals collected</h2>
 <ul>
-  <li><strong>Momentum</strong> — commit count and daily cadence over the window, trend vs.
-    the previous window, days since last commit.</li>
-  <li><strong>Working style</strong> — commit size distribution (iterative small commits vs.
-    one big dump), trivial/low-effort commit messages.</li>
-  <li><strong>Struggle markers</strong> — consecutive fix/revert-style commits, failing CI
-    runs and whether failures persist across pushes, force-pushes that follow
-    a multi-day silence.</li>
-  <li><strong>Claude Code usage (bonus signal)</strong> — presence and update frequency of
-    <code>CLAUDE.md</code>, presence of a committed <code>.claude/</code> directory. Never required,
-    never counted against a participant if absent.</li>
-  <li><strong>Structural basics</strong> — README, tests, file count, repo size.</li>
+  <li><strong>Momentum</strong> &mdash; commit count and cadence, trend vs. the
+      previous window of equal length, days since last commit.</li>
+  <li><strong>Working style</strong> &mdash; commit size distribution (iterative
+      commits vs. one big dump), placeholder-level commit messages.</li>
+  <li><strong>Struggle markers</strong> &mdash; consecutive fix/revert commit runs,
+      CI failures persisting across commits, a long silence followed by a burst
+      of commits.</li>
+  <li><strong>Claude Code usage (bonus)</strong> &mdash; whether <code>CLAUDE.md</code>
+      exists and keeps getting revised, whether <code>.claude/</code> artifacts are
+      committed. Never required, and never counted against a participant when
+      absent.</li>
+  <li><strong>Structural basics</strong> &mdash; README, tests, tracked file count,
+      repo size.</li>
 </ul>
+<p>Every threshold, and the reasoning behind it, is documented in
+<code>reference/signals.md</code> and lives in one <code>THRESHOLDS</code> dict in
+<code>scripts/analyze.py</code>.</p>
 
 <h2>Report format</h2>
-<p>One section per participant, most-urgent first:</p>
+<p>Ordered most-urgent-first, grouped by status:</p>
 <ol>
-  <li><strong>Status line</strong> — On track / Watch / Needs intervention.</li>
-  <li><strong>Evidence</strong> — 2-4 concrete bullets pulled from the signals above (e.g.
-    "No commits in 9 days — prior window averaged ~1/day"), not a restated
-    score. Participants who are On track get a single line, no bullet list.</li>
-  <li><strong>Suggested angle for intervention</strong> — one actionable line, only for
-    Watch / Needs intervention.</li>
+  <li><strong>Status</strong> &mdash; On track / Watch / Needs intervention.</li>
+  <li><strong>Evidence</strong> &mdash; 2&ndash;4 concrete bullets (&ldquo;No commits in
+      11 days &mdash; prior 14-day window had 18 commits&rdquo;), not a restated score.
+      On-track participants get a single line.</li>
+  <li><strong>Angle</strong> &mdash; one actionable line, only for Watch and Needs
+      intervention.</li>
 </ol>
-<p>The report closes with a footer: repos scanned/skipped, the window used,
-and a standing reminder to tell participants their repos are monitored for
-progress support (the tool surfaces this reminder — it does not send any
-notice itself; that's on the facilitator to communicate out of band).</p>
+<p>The footer records repos scanned, API calls made, the snapshot path, and a
+standing reminder that participants should be told their repos are monitored for
+progress support. The tool notifies nobody itself &mdash; that's on the facilitator.</p>
 
-<h2>Config needed at invocation time</h2>
-<ul>
-  <li><strong>GitHub org name</strong> (required) — the skill asks if not given, or offers
-    <code>gh org list</code> to pick from.</li>
-  <li><strong>Roster file</strong> (optional) — a JSON file mapping GitHub login → display
-    name, e.g. <code>{"jsmith42": "Jane Smith"}</code>. Without one, the report uses raw
-    GitHub handles.</li>
-  <li><strong>Window</strong> (optional) — defaults as described above; override with a date
-    range if you want something other than "since last run."</li>
-</ul>
-<p>Repo → participant mapping: every repo in the org is treated as one
-participant unit, identified by repo name (with a best-effort GitHub handle
-guess from the most frequent commit author in the window).</p>
+<h2>Testing</h2>
+<pre><code>python3 .claude/skills/participant-progress/scripts/selftest.py</code></pre>
+<p>Builds a synthetic nine-participant cohort covering every signal, runs the real
+pipeline over it, and asserts the statuses, evidence wording, urgency ordering,
+and run-over-run diffing all come out right. No network, no credentials. Run it
+after changing any threshold.</p>
 
-<h2>Explicitly out of scope (v1)</h2>
+<h2>Layout</h2>
 <ul>
-  <li>No scheduling, cron, or background execution — on-demand only.</li>
-  <li>No Slack, email, or push notifications.</li>
-  <li>No dashboard or web UI.</li>
-  <li>No write access to participant repos, ever.</li>
+  <li><code>SKILL.md</code> &mdash; how Claude runs the scan and presents the briefing</li>
+  <li><code>scripts/scan.py</code> &mdash; CLI: mapping, windows, snapshots, output</li>
+  <li><code>scripts/ghclient.py</code> &mdash; read-only GitHub client (<code>gh</code> CLI or REST)</li>
+  <li><code>scripts/collect.py</code> &mdash; per-repo signal collection</li>
+  <li><code>scripts/analyze.py</code> &mdash; thresholds, statuses, evidence, angles</li>
+  <li><code>scripts/render.py</code> &mdash; Markdown and HTML renderers</li>
+  <li><code>scripts/selftest.py</code> &mdash; offline fixture test</li>
+  <li><code>reference/signals.md</code> &mdash; what each signal means and why the threshold sits there</li>
+  <li><code>data/&lt;org&gt;/</code> &mdash; snapshots (gitignored &mdash; local participant activity data)</li>
 </ul>
 
-<h2>Under the hood</h2>
-<ul>
-  <li><code>~/.claude/skills/participant-progress/SKILL.md</code> — orchestration and
-    report-writing instructions for Claude.</li>
-  <li><code>~/.claude/skills/participant-progress/scripts/scan.py</code> — the data
-    collector. Pure Python 3.6+ standard library, shells out to <code>gh api</code> /
-    <code>gh repo list</code>. Prints one JSON report to stdout and writes timestamped
-    snapshots plus a <code>latest.json</code> under
-    <code>~/.claude/skills/participant-progress/data/&lt;org&gt;/</code>.</li>
-</ul>
-<p>Requires the <code>gh</code> CLI installed and authenticated (<code>gh auth login</code>) with at
-least <code>read:org</code> and <code>repo</code> scope.</p>
+<h2>Scope</h2>
+<p>v1 is on-demand only: no scheduling, no Slack or email, no dashboard, and no
+write access to participant repos. Automation comes later, once the signal design
+is trusted.</p>
 
 </main>
 </body>

@@ -5,82 +5,110 @@ programs. It scans a GitHub org's participant repos and produces a
 facilitator-facing briefing: who's progressing well, who's stuck, and what
 specifically to look at before intervening.
 
-Invoke it by asking Claude Code to check on participants, get a cohort
-progress report, or triage repos before office hours — it's registered as
-the `participant-progress` skill (`~/.claude/skills/participant-progress/`).
+Invoke it by asking Claude Code for a cohort progress report, who's gone quiet,
+or a repo triage before office hours — it's registered as the
+`participant-progress` skill in `.claude/skills/participant-progress/`.
 
 ## What it does
 
-1. Lists every non-archived repo in a given GitHub org via the `gh` CLI
-   (read-only — GET requests only, never writes to a participant's repo).
-2. Pulls per-repo signals over a time window (default: since the last run
-   for that org, or the last 14 days on a first run).
-3. Snapshots the results to disk so the next run can report *change*
-   (accelerating / flat / declining / stalled) instead of just a static
-   state.
-4. Prints one Markdown briefing, ordered by urgency, sized to be read in
-   under a minute.
+1. Lists every non-archived, non-fork repo in a GitHub org (read-only — every
+   call is a GET; nothing is ever written to a participant's repo).
+2. Pulls per-repo signals over a time window (default: since the last run for
+   that org, else the last 14 days).
+3. Snapshots the results to disk so the next run reports *change*
+   ("no new commits since the last scan") rather than a static picture.
+4. Writes the briefing as Markdown and as a self-contained HTML page, ordered
+   by urgency and sized to read in under a minute.
 
-## Signals collected per repo
+## Quick start
 
-- **Momentum** — commit count and daily cadence over the window, trend vs.
-  the previous window, days since last commit.
-- **Working style** — commit size distribution (iterative small commits vs.
-  one big dump), trivial/low-effort commit messages.
-- **Struggle markers** — consecutive fix/revert-style commits, failing CI
-  runs and whether failures persist across pushes, force-pushes that follow
-  a multi-day silence.
-- **Claude Code usage (bonus signal)** — presence and update frequency of
-  `CLAUDE.md`, presence of a committed `.claude/` directory. Never required,
-  never counted against a participant if absent.
-- **Structural basics** — README, tests, file count, repo size.
+```bash
+cd .claude/skills/participant-progress/scripts
+
+python3 scan.py --org agentic-ai-coop \
+  --roster ../roster.csv \
+  --md /tmp/cohort.md --html /tmp/cohort.html
+```
+
+With no `--md`/`--html`/`--out`, the Markdown briefing prints to stdout.
+`python3 scan.py --help` lists every flag.
+
+**Auth:** prefers the `gh` CLI when it's installed and `gh auth status` passes,
+so there's no token to manage. Falls back to `GH_TOKEN` / `GITHUB_TOKEN` when
+`gh` isn't available. Needs read access to the org.
+
+## Repo → participant mapping
+
+In priority order:
+
+1. **Roster file** (`--roster`, CSV or JSON) — for repos that break the
+   convention, and for mapping handles to real names. See
+   `.claude/skills/participant-progress/roster.example.csv`.
+2. **Naming convention** (`--pattern`, default `s2p-{participant}`) —
+   `s2p-jane-smith` becomes "Jane Smith".
+3. **Fallback** — the repo name is used as the label, and the repo is listed
+   under "Name inferred from repo" in the report so the roster can be fixed.
+   Nothing is silently dropped.
+
+## Signals collected
+
+- **Momentum** — commit count and cadence, trend vs. the previous window of
+  equal length, days since last commit.
+- **Working style** — commit size distribution (iterative commits vs. one big
+  dump), placeholder-level commit messages.
+- **Struggle markers** — consecutive fix/revert commit runs, CI failures
+  persisting across commits, a long silence followed by a burst of commits.
+- **Claude Code usage (bonus)** — whether `CLAUDE.md` exists and keeps getting
+  revised, whether `.claude/` artifacts are committed. Never required, and
+  never counted against a participant when absent.
+- **Structural basics** — README, tests, tracked file count, repo size.
+
+Every threshold, and the reasoning behind it, is documented in
+`.claude/skills/participant-progress/reference/signals.md` and lives in one
+`THRESHOLDS` dict in `scripts/analyze.py`.
 
 ## Report format
 
-One section per participant, most-urgent first:
+Ordered most-urgent-first, grouped by status:
 
-1. **Status line** — On track / Watch / Needs intervention.
-2. **Evidence** — 2-4 concrete bullets pulled from the signals above (e.g.
-   "No commits in 9 days — prior window averaged ~1/day"), not a restated
-   score. Participants who are On track get a single line, no bullet list.
-3. **Suggested angle for intervention** — one actionable line, only for
-   Watch / Needs intervention.
+1. **Status** — On track / Watch / Needs intervention.
+2. **Evidence** — 2–4 concrete bullets ("No commits in 11 days — prior 14-day
+   window had 18 commits"), not a restated score. On-track participants get a
+   single line.
+3. **Angle** — one actionable line, only for Watch and Needs intervention.
 
-The report closes with a footer: repos scanned/skipped, the window used,
-and a standing reminder to tell participants their repos are monitored for
-progress support (the tool surfaces this reminder — it does not send any
-notice itself; that's on the facilitator to communicate out of band).
+The footer records repos scanned, API calls made, the snapshot path, and a
+standing reminder that participants should be told their repos are monitored
+for progress support. The tool notifies nobody itself — that's on the
+facilitator.
 
-## Config needed at invocation time
+## Testing
 
-- **GitHub org name** (required) — the skill asks if not given, or offers
-  `gh org list` to pick from.
-- **Roster file** (optional) — a JSON file mapping GitHub login → display
-  name, e.g. `{"jsmith42": "Jane Smith"}`. Without one, the report uses raw
-  GitHub handles.
-- **Window** (optional) — defaults as described above; override with a date
-  range if you want something other than "since last run."
+```bash
+python3 .claude/skills/participant-progress/scripts/selftest.py
+```
 
-Repo → participant mapping: every repo in the org is treated as one
-participant unit, identified by repo name (with a best-effort GitHub handle
-guess from the most frequent commit author in the window).
+Builds a synthetic nine-participant cohort covering every signal, runs the real
+pipeline over it, and asserts the statuses, evidence wording, urgency ordering,
+and run-over-run diffing all come out right. No network, no credentials. Run it
+after changing any threshold.
 
-## Explicitly out of scope (v1)
+## Layout
 
-- No scheduling, cron, or background execution — on-demand only.
-- No Slack, email, or push notifications.
-- No dashboard or web UI.
-- No write access to participant repos, ever.
+| Path | Purpose |
+| --- | --- |
+| `SKILL.md` | How Claude runs the scan and presents the briefing |
+| `scripts/scan.py` | CLI: mapping, windows, snapshots, output |
+| `scripts/ghclient.py` | Read-only GitHub client (`gh` CLI or REST) |
+| `scripts/collect.py` | Per-repo signal collection |
+| `scripts/analyze.py` | Thresholds, statuses, evidence, angles |
+| `scripts/render.py` | Markdown and HTML renderers |
+| `scripts/selftest.py` | Offline fixture test |
+| `reference/signals.md` | What each signal means and why the threshold is set there |
+| `data/<org>/` | Snapshots (gitignored — local participant activity data) |
 
-## Under the hood
+## Scope
 
-- `~/.claude/skills/participant-progress/SKILL.md` — orchestration and
-  report-writing instructions for Claude.
-- `~/.claude/skills/participant-progress/scripts/scan.py` — the data
-  collector. Pure Python 3.6+ standard library, shells out to `gh api` /
-  `gh repo list`. Prints one JSON report to stdout and writes timestamped
-  snapshots plus a `latest.json` under
-  `~/.claude/skills/participant-progress/data/<org>/`.
-
-Requires the `gh` CLI installed and authenticated (`gh auth login`) with at
-least `read:org` and `repo` scope.
+v1 is on-demand only: no scheduling, no Slack or email, no dashboard, and no
+write access to participant repos. Automation comes later, once the signal
+design is trusted.
