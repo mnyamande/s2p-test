@@ -122,13 +122,31 @@ def map_repo(repo_name, roster_by_repo, pattern_re):
 
 # -- repo discovery --------------------------------------------------------
 
+BLOCKED_HINT = (
+    "Listing every repo in '%s' was refused (%s).\n\n"
+    "If you are running inside a Claude Code cloud session, this is expected: a "
+    "cloud session's proxy only allows repo-scoped API paths for the repos "
+    "attached to the session, so /orgs/<org>/repos is blocked no matter what "
+    "your GitHub credentials can see. Either:\n"
+    "  * run this skill from your own terminal, where `gh` is unrestricted, or\n"
+    "  * pass the repos explicitly with --repos or --repos-from <file>.\n\n"
+    "If you are running locally, check the org name and that `gh auth status` "
+    "shows an account with read access to the org."
+)
+
+
 def list_org_repos(gh, org, include_forks=False, include_archived=False):
-    repos = gh.paginate("/orgs/%s/repos" % org, {"type": "all", "sort": "pushed"},
-                        accept_missing=True)
-    if repos is None:
-        # A personal account rather than an org — same shape, different endpoint.
-        repos = gh.paginate("/users/%s/repos" % org, {"type": "owner", "sort": "pushed"},
-                            accept_missing=True)
+    try:
+        repos = gh.paginate("/orgs/%s/repos" % org, {"type": "all", "sort": "pushed"})
+    except GitHubError as exc:
+        if exc.status == 404:
+            # A personal account rather than an org — same shape, different endpoint.
+            repos = gh.paginate("/users/%s/repos" % org, {"type": "owner", "sort": "pushed"},
+                                accept_missing=True)
+        elif exc.status in (403, 401):
+            raise GitHubError(BLOCKED_HINT % (org, "HTTP %s" % exc.status), exc.status)
+        else:
+            raise
     if repos is None:
         raise GitHubError(
             "Could not list repos for '%s'. Check the org name and that your "
@@ -229,6 +247,9 @@ def build_parser():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--org", default=DEFAULT_ORG, help="GitHub org (default: %s)" % DEFAULT_ORG)
     ap.add_argument("--repos", help="comma-separated owner/name list; skips org enumeration")
+    ap.add_argument("--repos-from", dest="repos_from",
+                    help="file with one owner/name per line (# comments allowed); "
+                         "use this when org-wide listing is blocked, e.g. in a cloud session")
     ap.add_argument("--pattern", default=DEFAULT_PATTERN,
                     help="repo naming convention (default: %s)" % DEFAULT_PATTERN)
     ap.add_argument("--no-pattern", action="store_true", help="disable convention matching")
@@ -246,6 +267,9 @@ def build_parser():
     ap.add_argument("--max-repos", type=int, help="stop after N repos (useful for a dry run)")
     ap.add_argument("--max-commit-details", type=int, default=40,
                     help="per-repo cap on commit-size lookups (default 40)")
+    ap.add_argument("--loc-mode", choices=("estimate", "exact", "off"), default="estimate",
+                    help="lines of code: estimate from blob sizes (free, default), "
+                         "exact (one API call per code file), or off")
     ap.add_argument("--include-forks", action="store_true")
     ap.add_argument("--include-archived", action="store_true")
     ap.add_argument("--no-gh", action="store_true", help="force the REST backend")
@@ -263,9 +287,25 @@ def main(argv=None):
     snapshot = load_snapshot(snap_path)
     since, until, compared_to = resolve_window(args, snapshot)
 
-    if args.repos:
-        repo_names = [r.strip() for r in args.repos.split(",") if r.strip()]
-        skipped = 0
+    if args.repos or args.repos_from:
+        repo_names, skipped = [], 0
+        if args.repos:
+            repo_names += [r.strip() for r in args.repos.split(",") if r.strip()]
+        if args.repos_from:
+            if not os.path.exists(args.repos_from):
+                raise SystemExit("repo list file not found: %s" % args.repos_from)
+            with open(args.repos_from) as fh:
+                for line in fh:
+                    line = line.split("#", 1)[0].strip()
+                    if not line:
+                        continue
+                    repo_names.append(line if "/" in line else "%s/%s" % (args.org, line))
+        seen, deduped = set(), []
+        for name in repo_names:
+            if name not in seen:
+                seen.add(name)
+                deduped.append(name)
+        repo_names = deduped
     else:
         repo_names, skipped = list_org_repos(gh, args.org, args.include_forks, args.include_archived)
     if args.max_repos:
@@ -279,7 +319,8 @@ def main(argv=None):
 
     def fetch(full_name):
         try:
-            return collect_repo(gh, full_name, since, until, args.max_commit_details)
+            return collect_repo(gh, full_name, since, until, args.max_commit_details,
+                                args.loc_mode)
         except GitHubError as exc:
             return {"full_name": full_name, "error": str(exc)}
 
@@ -330,6 +371,7 @@ def main(argv=None):
             "api_calls": gh.calls,
             "backend": gh.backend,
             "pattern": None if args.no_pattern else args.pattern,
+            "loc_mode": args.loc_mode,
             "roster": os.path.abspath(args.roster) if args.roster else None,
             "snapshot_path": ("not written (--no-snapshot)" if args.no_snapshot
                               else os.path.join(snap_path, "latest.json")),

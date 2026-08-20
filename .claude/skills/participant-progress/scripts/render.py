@@ -42,7 +42,27 @@ def _headline(entry):
     if days is not None:
         bits.append("last commit %s" % ("today" if days == 0 else
                                         "yesterday" if days == 1 else "%d days ago" % days))
+    loc = entry.get("loc")
+    if loc:
+        approx = "" if entry.get("loc_exact") else "~"
+        more = "+" if entry.get("loc_partial") else ""
+        bits.append("%s%s%s lines of code" % (approx, "{:,}".format(loc), more))
+    elif loc == 0:
+        bits.append("no code yet")
     return " · ".join(bits)
+
+
+def badges(entry):
+    """(label, css-class) pairs for the README and depth-of-thinking pills."""
+    out = []
+    if entry.get("has_readme") is not None:
+        out.append(("HAS README", "ontrack") if entry["has_readme"]
+                   else ("NO README", "intervene"))
+    depth = entry.get("depth")
+    if depth:
+        out.append((depth["level"], {"DEEP": "deep", "MEDIUM": "medium"}
+                    .get(depth["level"], "light")))
+    return out
 
 
 # -- Markdown --------------------------------------------------------------
@@ -75,9 +95,11 @@ def to_markdown(report):
         out.append("")
         if status == "On track":
             for entry in group:
-                line = "- **%s** — `%s` — %s" % (
+                marks = " · ".join("**%s**" % label for label, _ in badges(entry))
+                line = "- **%s** — `%s` — %s%s" % (
                     entry["participant"], ", ".join(r.split("/")[-1] for r in entry["repos"]),
-                    entry["evidence"][0] if entry["evidence"] else _headline(entry))
+                    entry["evidence"][0] if entry["evidence"] else _headline(entry),
+                    (" · " + marks) if marks else "")
                 out.append(line)
             out.append("")
             continue
@@ -85,6 +107,9 @@ def to_markdown(report):
             out.append("### %s — `%s`" % (entry["participant"],
                                           ", ".join(r.split("/")[-1] for r in entry["repos"])))
             head = _headline(entry)
+            marks = " · ".join("**%s**" % label for label, _ in badges(entry))
+            if marks:
+                head += " · " + marks
             if entry.get("status_change"):
                 head += " · _%s_" % entry["status_change"]
             out.append("%s  " % head)
@@ -129,19 +154,34 @@ def to_markdown(report):
 # -- HTML ------------------------------------------------------------------
 
 CSS = """
-:root{color-scheme:light dark;--bg:#fbfbfa;--card:#fff;--fg:#1c1c1a;--muted:#6b6b66;
---border:#e3e3df;--rule:#efefec;--accent:#3d5a80;
---intervene:#a8321f;--intervene-bg:#fbeae7;--watch:#8a5a10;--watch-bg:#fdf3e2;
---ontrack:#2f6b46;--ontrack-bg:#e9f4ee;--spark:#8f8f88;}
-@media (prefers-color-scheme:dark){:root{--bg:#16171a;--card:#1e2024;--fg:#e8e8e4;
---muted:#9b9b95;--border:#31343a;--rule:#26282d;--accent:#9db8d8;
---intervene:#ff9c85;--intervene-bg:#3a201c;--watch:#ecc07a;--watch-bg:#332916;
---ontrack:#8fd3a8;--ontrack-bg:#1b2f23;--spark:#7d7d77;}}
+:root{color-scheme:light dark;
+--bg:#f4f7f5;
+--bg-grad:linear-gradient(170deg,#e9f3ec 0%,#eef3f7 55%,#eaeef8 100%);
+--card:rgba(255,255,255,.86);--panel:rgba(240,245,243,.75);
+--fg:#16211f;--muted:#5d6b68;--border:#d5e0da;--rule:#e2ebe5;--accent:#2f5d7c;
+--intervene:#a8321f;--intervene-bg:#fbe9e6;--watch:#8a5a10;--watch-bg:#fcf2e1;
+--ontrack:#20674a;--ontrack-bg:#e4f2ea;
+--depth:#245b86;--depth-bg:#e3eef7;
+--neutral:#5d6b68;--neutral-bg:#e8ecea;
+--spark:#7f9089;}
+@media (prefers-color-scheme:dark){:root{
+--bg:#0a1a19;
+--bg-grad:linear-gradient(170deg,#06211a 0%,#08202a 55%,#0a1830 100%);
+--card:rgba(19,33,36,.72);--panel:rgba(10,24,28,.55);
+--fg:#e6ede9;--muted:#93a5a1;--border:#263a3e;--rule:#1d2e32;--accent:#8fbede;
+--intervene:#ff9c85;--intervene-bg:rgba(90,32,24,.55);
+--watch:#ecc07a;--watch-bg:rgba(74,58,26,.5);
+--ontrack:#7fd3a5;--ontrack-bg:rgba(21,64,45,.5);
+--depth:#87c2ea;--depth-bg:rgba(23,56,82,.5);
+--neutral:#93a5a1;--neutral-bg:rgba(45,60,62,.5);
+--spark:#6f8a83;}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);line-height:1.55;
+html{min-height:100%;background-color:var(--bg);background-image:var(--bg-grad);
+background-repeat:no-repeat;background-size:100% 100%}
+body{margin:0;background:transparent;min-height:100vh;color:var(--fg);line-height:1.55;
 font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
 -webkit-font-smoothing:antialiased}
-main{max-width:820px;margin:0 auto;padding:2.5rem 1.25rem 4rem}
+main{max-width:840px;margin:0 auto;padding:2.5rem 1.25rem 4rem}
 h1{font-size:1.6rem;margin:0 0 .35rem;letter-spacing:-.01em}
 .sub{color:var(--muted);font-size:.85rem;margin:0 0 1.5rem}
 .tally{display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 2rem}
@@ -158,13 +198,15 @@ border-radius:10px;padding:1rem 1.1rem;margin:0 0 .8rem}
 .card.intervene{border-left-color:var(--intervene)}
 .card.watch{border-left-color:var(--watch)}
 .card.ontrack{border-left-color:var(--ontrack);padding:.65rem 1.1rem}
-.top{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
-.name{font-weight:650;font-size:1.02rem}
-.chip{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+.top{display:flex;align-items:baseline;gap:.45rem;flex-wrap:wrap}
+.name{font-weight:650;font-size:1.02rem;margin-right:.15rem}
+.chip{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
 padding:.15rem .5rem;border-radius:999px;white-space:nowrap}
 .chip.intervene{color:var(--intervene);background:var(--intervene-bg)}
 .chip.watch{color:var(--watch);background:var(--watch-bg)}
-.chip.ontrack{color:var(--ontrack);background:var(--ontrack-bg)}
+.chip.ontrack,.chip.deep{color:var(--ontrack);background:var(--ontrack-bg)}
+.chip.medium{color:var(--depth);background:var(--depth-bg)}
+.chip.light,.chip.neutral{color:var(--neutral);background:var(--neutral-bg)}
 a.repo{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;
 color:var(--accent);text-decoration:none}
 a.repo:hover{text-decoration:underline}
@@ -172,7 +214,7 @@ a.repo:hover{text-decoration:underline}
 .change{color:var(--watch);font-style:italic}
 ul{margin:.5rem 0 0;padding-left:1.1rem}
 li{margin:.28rem 0;font-size:.9rem}
-.angle{margin:.75rem 0 0;padding:.5rem .7rem;background:var(--bg);border-radius:7px;
+.angle{margin:.75rem 0 0;padding:.5rem .7rem;background:var(--panel);border-radius:7px;
 font-size:.86rem}
 .angle b{color:var(--accent)}
 .sparkwrap{display:flex;align-items:flex-end;gap:.5rem;margin:.55rem 0 .15rem}
@@ -185,8 +227,9 @@ border-radius:1.5px 1.5px 0 0}
 footer{margin-top:2.5rem;padding-top:1rem;border-top:1px solid var(--rule);
 color:var(--muted);font-size:.78rem}
 footer code{font-size:.75rem;word-break:break-all}
-.note{margin-top:.8rem;padding:.6rem .8rem;border:1px dashed var(--border);border-radius:8px}
-@media print{body{background:#fff}.card{break-inside:avoid}}
+.note{margin-top:.8rem;padding:.6rem .8rem;border:1px dashed var(--border);border-radius:8px;
+background:var(--panel)}
+@media print{html{background:#fff;background-image:none}.card{break-inside:avoid}}
 """
 
 
@@ -235,6 +278,11 @@ def to_html(report):
             p.append("<div class='card %s'>" % key)
             p.append("<div class='top'><span class='name'>%s</span>" % esc(entry["participant"]))
             p.append("<span class='chip %s'>%s</span>" % (key, esc(status)))
+            for label, cls in badges(entry):
+                title = ""
+                if label in ("DEEP", "MEDIUM", "LIGHT") and (entry.get("depth") or {}).get("reasons"):
+                    title = " title='%s'" % esc(", ".join(entry["depth"]["reasons"]))
+                p.append("<span class='chip %s'%s>%s</span>" % (cls, title, esc(label)))
             for repo, url in zip(entry["repos"], entry.get("urls") or []):
                 label = repo.split("/")[-1]
                 p.append("<a class='repo' href='%s'>%s</a>" % (esc(url or "#"), esc(label)))

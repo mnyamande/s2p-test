@@ -30,6 +30,10 @@ THRESHOLDS = {
     "rewrite_skew_hours": 24,
     "rewrite_min_commits": 3,
     "new_repo_grace_days": 3,
+    "depth_deep": 55,          # depth score at/above this reads as DEEP
+    "depth_medium": 30,        # ...and at/above this as MEDIUM
+    "readme_substantial": 1200,  # bytes; below this a README is a stub
+    "msg_len_considered": 32,  # mean first-line length that reads as descriptive
 }
 
 TRIVIAL_RE = re.compile(
@@ -217,7 +221,11 @@ def _style_flags(result, m, commits, chron):
                 "iterative", SEV_INFO,
                 "Small iterative commits (median %d lines changed)" % m["median_commit_lines"]))
 
-    msgs = [c["message"].splitlines()[0] for c in commits if c.get("message")]
+    full = [c["message"] for c in commits if c.get("message")]
+    msgs = [msg.splitlines()[0] for msg in full]
+    m["mean_msg_len"] = round(sum(len(x) for x in msgs) / float(len(msgs)), 1) if msgs else 0
+    m["msg_body_ratio"] = (round(sum(1 for x in full if len(x.splitlines()) > 1) / float(len(full)), 2)
+                           if full else 0)
     m["trivial_msg_count"] = sum(1 for msg in msgs if TRIVIAL_RE.match(msg.strip()) or len(msg.strip()) < 8)
     if len(msgs) >= THRESHOLDS["min_msgs_for_quality"]:
         ratio = m["trivial_msg_count"] / float(len(msgs))
@@ -360,9 +368,16 @@ def _claude_flags(result, m, repo):
 def _structure_flags(result, m, repo, brand_new):
     tree = repo.get("tree") or {}
     m["file_count"] = tree.get("file_count")
-    m["has_readme"] = tree.get("has_readme")
+    m["has_readme"] = bool(tree.get("has_readme"))
     m["has_tests"] = tree.get("has_tests")
     m["size_kb"] = repo.get("size_kb")
+
+    loc = repo.get("loc") or {}
+    m["loc"] = loc.get("lines")
+    m["loc_exact"] = bool(loc.get("exact"))
+    m["loc_partial"] = bool(loc.get("partial"))
+    m["code_file_count"] = loc.get("code_files")
+    m["depth"] = _depth_score(m, tree, repo)
     if not tree.get("available") or brand_new:
         return
     missing = []
@@ -375,6 +390,69 @@ def _structure_flags(result, m, repo, brand_new):
             "thin_structure", SEV_INFO,
             "%s across %s tracked files" % (" and ".join(missing).capitalize(), tree.get("file_count")),
             weight=3))
+
+
+def _depth_score(m, tree, repo):
+    """How much considered work the repo shows, beyond raw commit volume.
+
+    Deliberately multi-factor: no single artefact makes a repo deep, and
+    nothing here is a struggle signal — it never changes a participant's
+    status, it only labels the character of the work.
+    """
+    points, reasons = 0, []
+
+    if tree.get("has_readme"):
+        points += 8
+        if (tree.get("readme_bytes") or 0) >= THRESHOLDS["readme_substantial"]:
+            points += 8
+            reasons.append("substantial README")
+        else:
+            reasons.append("README present")
+    if tree.get("has_claude_md"):
+        points += 8
+        revisions = (repo.get("claude_md") or {}).get("commit_count") or 0
+        if revisions >= 3:
+            points += 8
+            reasons.append("CLAUDE.md revised %d times" % revisions)
+        else:
+            reasons.append("CLAUDE.md present")
+    if tree.get("claude_dir_paths"):
+        points += 6
+        reasons.append("committed .claude/ artefacts")
+    if tree.get("has_tests"):
+        points += 14
+        reasons.append("has tests")
+    if (tree.get("doc_count") or 0) >= 2:
+        points += 8
+        reasons.append("%d supporting docs" % tree["doc_count"])
+    if m.get("ci_configured"):
+        points += 6
+        reasons.append("CI configured")
+
+    dirs = len(tree.get("top_level_dirs") or [])
+    if dirs >= 3:
+        points += 8
+        reasons.append("%d top-level modules" % dirs)
+    elif dirs == 2:
+        points += 4
+    if (tree.get("code_file_count") or 0) >= 10:
+        points += 4
+
+    if m.get("mean_msg_len", 0) >= THRESHOLDS["msg_len_considered"] \
+            and m.get("trivial_msg_ratio", 0) < 0.3:
+        points += 12
+        reasons.append("descriptive commit messages")
+    if m.get("msg_body_ratio", 0) >= 0.15:
+        points += 8
+        reasons.append("commits explain why, not just what")
+
+    if points >= THRESHOLDS["depth_deep"]:
+        level = "DEEP"
+    elif points >= THRESHOLDS["depth_medium"]:
+        level = "MEDIUM"
+    else:
+        level = "LIGHT"
+    return {"level": level, "score": points, "reasons": reasons[:4]}
 
 
 # -- run-over-run change ---------------------------------------------------
@@ -449,9 +527,20 @@ def summarise_participant(name, handle, repo_results, prev_participant=None):
             for i, value in enumerate(series[:len(daily)]):
                 daily[i] += value
 
+    primary = repo_results[0]["metrics"] if repo_results else {}
+    loc_values = [r["metrics"].get("loc") for r in repo_results
+                  if r["metrics"].get("loc") is not None]
+    depths = [r["metrics"].get("depth") for r in repo_results if r["metrics"].get("depth")]
+    best_depth = max(depths, key=lambda d: d["score"]) if depths else None
+
     entry = {
         "participant": name,
         "daily": daily,
+        "loc": sum(loc_values) if loc_values else None,
+        "loc_exact": all(r["metrics"].get("loc_exact") for r in repo_results),
+        "loc_partial": any(r["metrics"].get("loc_partial") for r in repo_results),
+        "has_readme": all(r["metrics"].get("has_readme") for r in repo_results),
+        "depth": best_depth,
         "handle": handle,
         "repos": [r["repo"] for r in repo_results],
         "urls": [r.get("html_url") for r in repo_results],

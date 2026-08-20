@@ -122,10 +122,20 @@ python3 scan.py --org agentic-ai-coop \
   --md /tmp/cohort.md --html /tmp/cohort.html</code></pre>
 <p>With no <code>--md</code>/<code>--html</code>/<code>--out</code>, the Markdown
 briefing prints to stdout. <code>python3 scan.py --help</code> lists every flag.</p>
+<p>Lines of code are estimated from file sizes by default (free, within ~5%);
+<code>--loc-mode exact</code> counts real lines at one API call per code file.</p>
 <p><strong>Auth:</strong> prefers the <code>gh</code> CLI when it's installed and
 <code>gh auth status</code> passes, so there's no token to manage. Falls back to
 <code>GH_TOKEN</code> / <code>GITHUB_TOKEN</code> when <code>gh</code> isn't
 available. Needs read access to the org.</p>
+
+<h2>Running from a Claude Code cloud session</h2>
+<p>Cloud sessions can only reach repo-scoped API paths for the repos attached to the
+session, so org-wide listing is refused there. The scan detects this and explains
+it. Pass an explicit list instead:</p>
+<pre><code>python3 scan.py --org agentic-ai-coop --repos-from cohort-repos.txt --md /tmp/cohort.md</code></pre>
+<p>One <code>owner/name</code> (or bare repo name) per line, <code>#</code> comments
+allowed. Running from your own terminal needs none of this.</p>
 
 <h2>Repo &rarr; participant mapping</h2>
 <p>In priority order:</p>
@@ -156,6 +166,10 @@ available. Needs read access to the org.</p>
       absent.</li>
   <li><strong>Structural basics</strong> &mdash; README, tests, tracked file count,
       repo size.</li>
+  <li><strong>Scale and depth</strong> &mdash; lines of code (code only; docs,
+      lockfiles, minified bundles and vendored directories excluded), plus a
+      depth-of-thinking read built from README substance, <code>CLAUDE.md</code>
+      upkeep, tests, docs, CI, module structure and commit-message quality.</li>
 </ul>
 <p>Every threshold, and the reasoning behind it, is documented in
 <code>reference/signals.md</code> and lives in one <code>THRESHOLDS</code> dict in
@@ -164,7 +178,11 @@ available. Needs read access to the org.</p>
 <h2>Report format</h2>
 <p>Ordered most-urgent-first, grouped by status:</p>
 <ol>
-  <li><strong>Status</strong> &mdash; On track / Watch / Needs intervention.</li>
+  <li><strong>Status</strong> &mdash; On track / Watch / Needs intervention, alongside
+      a <code>HAS README</code> / <code>NO README</code> pill and a <code>DEEP</code> /
+      <code>MEDIUM</code> / <code>LIGHT</code> depth-of-thinking pill. Neither pill
+      changes the status &mdash; they describe the work, not whether someone is
+      stuck.</li>
   <li><strong>Evidence</strong> &mdash; 2&ndash;4 concrete bullets (&ldquo;No commits in
       11 days &mdash; prior 14-day window had 18 commits&rdquo;), not a restated score.
       On-track participants get a single line.</li>

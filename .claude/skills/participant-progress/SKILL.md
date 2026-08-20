@@ -58,7 +58,36 @@ python3 scan.py --org agentic-ai-coop --max-repos 3 --no-snapshot
 
 `scan.py --help` lists everything. Useful flags: `--jobs` (parallel fetches,
 default 6), `--max-commit-details` (per-repo cap on commit-size lookups),
-`--include-archived`, `--no-gh` (force the REST backend), `--verbose`.
+`--loc-mode` (see below), `--include-archived`, `--no-gh` (force the REST
+backend), `--verbose`.
+
+### Lines of code
+
+`--loc-mode estimate` (default) derives line counts from the file sizes already
+in the repo tree — no extra API calls, and typically within ~5% of the real
+number. The report prefixes these with `~`.
+
+`--loc-mode exact` fetches every code blob and counts real lines. Accurate, but
+it costs one API call per code file, so reserve it for a final read or a small
+cohort. `--loc-mode off` drops the number entirely.
+
+Either way only code counts: docs, lockfiles, minified bundles and vendored
+directories (`node_modules/`, `dist/`, `.venv/`, …) are excluded.
+
+### Running from a Claude Code cloud session
+
+Org-wide listing (`/orgs/<org>/repos`) is blocked inside cloud sessions — the
+session proxy only permits repo-scoped paths for the repos attached to that
+session. The scan detects this and says so. Work around it with an explicit
+list:
+
+```bash
+python3 scan.py --org agentic-ai-coop --repos-from cohort-repos.txt --md /tmp/cohort.md
+```
+
+`--repos-from` takes one `owner/name` (or bare repo name) per line, `#`
+comments allowed. Running from your own terminal, where `gh` is unrestricted,
+needs none of this.
 
 Auth: the script uses `gh` if it is installed and `gh auth status` passes,
 otherwise `GH_TOKEN` / `GITHUB_TOKEN`. It needs read access to the org.
@@ -80,7 +109,24 @@ You may add judgement the script cannot have — e.g. "Jane's stall lines up
 with the week she flagged travel." Do not soften or drop a flagged signal; the
 evidence bullets are the point.
 
-## 4. Tuning
+## 4. What the pills mean
+
+Each participant carries up to three pills next to their name:
+
+- **Status** — On track / Watch / Needs intervention.
+- **README** — `HAS README` (green) or `NO README` (red).
+- **Depth of thinking** — `DEEP` (green), `MEDIUM` (blue), `LIGHT` (grey). A
+  multi-factor read of how considered the work is: README substance, CLAUDE.md
+  and its revisions, tests, supporting docs, CI, module structure, and whether
+  commit messages explain reasoning. It never changes a participant's status —
+  it labels the character of the work, not whether they are stuck.
+
+`LIGHT` on its own is not a problem, and is expected early in a program. It
+matters when it stays light while commit volume climbs — that is someone
+generating code without building understanding around it, which is worth a
+conversation even though nothing here is a struggle signal.
+
+## 5. Tuning
 
 Thresholds live in one dict, `THRESHOLDS` at the top of `scripts/analyze.py`
 (see `reference/signals.md` for what each one means and why it is set where it
@@ -94,7 +140,7 @@ It builds a synthetic cohort covering every signal, runs the real pipeline over
 it, and asserts the statuses, evidence, ordering, and run-over-run diffing all
 come out right. It needs no network and no credentials.
 
-## 5. Snapshots
+## 6. Snapshots
 
 Each run writes `data/<org>/latest.json` plus a timestamped copy in
 `data/<org>/runs/`. The next run diffs against `latest.json` to report change
@@ -102,7 +148,7 @@ Each run writes `data/<org>/latest.json` plus a timestamped copy in
 rather than just a static picture. Snapshots are gitignored — they are local
 state, and they contain participant activity data.
 
-## 6. Guardrails
+## 7. Guardrails
 
 - Read-only, always. Never add a write call to these scripts.
 - **Tell the cohort their repos are monitored for progress support.** The
@@ -118,6 +164,7 @@ state, and they contain participant activity data.
 | --- | --- |
 | `No usable GitHub credentials` | `gh auth login`, or export `GH_TOKEN` |
 | `Could not list repos for '<org>'` | Check the org name and that your account can see it; try `--repos owner/name` to test one repo |
+| Org listing refused (HTTP 403) | You're in a cloud session; use `--repos-from`, or run locally. See above |
 | Everyone shows as "Name inferred from repo" | The `--pattern` doesn't match; check actual repo names and pass the right one or a roster |
 | Scan is slow on a large org | Raise `--jobs`, lower `--max-commit-details` |
 | Rate limited | The client backs off and retries automatically; lower `--jobs` if it persists |

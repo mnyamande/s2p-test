@@ -78,6 +78,62 @@ artifacts, and absence says nothing about how someone is working. A
 `CLAUDE.md` that keeps getting revised is a good sign that project
 understanding is growing; it is never held against anyone that it isn't there.
 
+## Lines of code
+
+A rough complexity proxy shown in each participant's headline, not a signal —
+it never contributes to status. Only code counts; docs, lockfiles, minified
+bundles and vendored directories are excluded, and the extension list with its
+bytes-per-line divisors lives in `BYTES_PER_LINE` in `scripts/collect.py`.
+
+| Mode | How | Cost | Shown as |
+| --- | --- | --- | --- |
+| `estimate` (default) | Blob sizes from the tree ÷ bytes-per-line for the extension | Free — the tree is already fetched | `~1,240 lines of code` |
+| `exact` | Fetches each code blob and counts newlines | One API call per code file | `1,240 lines of code` |
+| `off` | — | — | omitted |
+
+A trailing `+` means the count is partial: the tree was truncated, or the
+per-repo file cap (250) or size cap (400 KB) was hit.
+
+Estimates land within roughly 5% on typical training repos. Verified against a
+real repo during development: estimate 165, exact 174, `git` ground truth 174.
+
+## README pill
+
+`HAS README` (green) or `NO README` (red), from a top-level file matching
+`readme(.*)`. Presence only — substance feeds the depth score instead.
+
+## Depth of thinking
+
+`DEEP` (green) / `MEDIUM` (blue) / `LIGHT` (grey), from a points total in
+`_depth_score` in `scripts/analyze.py`. **It never changes a participant's
+status.** It describes the character of the work, not whether someone is stuck.
+
+| Contributor | Points |
+| --- | --- |
+| README present | 8 |
+| README ≥ 1200 bytes (not a stub) | +8 |
+| `CLAUDE.md` present | 8 |
+| `CLAUDE.md` revised ≥ 3 times | +8 |
+| Committed `.claude/` artefacts | 6 |
+| Tests present | 14 |
+| ≥ 2 supporting docs beyond the README | 8 |
+| CI configured | 6 |
+| ≥ 3 top-level modules (2 scores 4) | 8 |
+| ≥ 10 code files | 4 |
+| Mean commit subject ≥ 32 chars and < 30% placeholders | 12 |
+| ≥ 15% of commits have a message body | 8 |
+
+`DEEP` at ≥ 55, `MEDIUM` at ≥ 30, `LIGHT` below that.
+
+The weighting is deliberate: tests and considered commit messages carry the
+most, because both are hard to produce without actually understanding the
+problem. No single artefact makes a repo deep — a `CLAUDE.md` alone gets you
+16 of 55.
+
+Read `LIGHT` as "early" rather than "bad". It earns attention when it persists
+while commit volume climbs: that pattern is code arriving faster than
+understanding.
+
 ## Structural basics
 
 | Flag | Trigger | Severity |

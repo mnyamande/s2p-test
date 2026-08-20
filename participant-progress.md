@@ -33,9 +33,25 @@ python3 scan.py --org agentic-ai-coop \
 With no `--md`/`--html`/`--out`, the Markdown briefing prints to stdout.
 `python3 scan.py --help` lists every flag.
 
+Lines of code are estimated from file sizes by default (free, within ~5%);
+`--loc-mode exact` counts real lines at one API call per code file.
+
 **Auth:** prefers the `gh` CLI when it's installed and `gh auth status` passes,
 so there's no token to manage. Falls back to `GH_TOKEN` / `GITHUB_TOKEN` when
 `gh` isn't available. Needs read access to the org.
+
+## Running from a Claude Code cloud session
+
+Cloud sessions can only reach repo-scoped API paths for the repos attached to
+the session, so org-wide listing is refused there. The scan detects this and
+explains it. Pass an explicit list instead:
+
+```bash
+python3 scan.py --org agentic-ai-coop --repos-from cohort-repos.txt --md /tmp/cohort.md
+```
+
+One `owner/name` (or bare repo name) per line, `#` comments allowed. Running
+from your own terminal needs none of this.
 
 ## Repo → participant mapping
 
@@ -62,6 +78,10 @@ In priority order:
   revised, whether `.claude/` artifacts are committed. Never required, and
   never counted against a participant when absent.
 - **Structural basics** — README, tests, tracked file count, repo size.
+- **Scale and depth** — lines of code (code only; docs, lockfiles, minified
+  bundles and vendored directories excluded), plus a depth-of-thinking read
+  built from README substance, `CLAUDE.md` upkeep, tests, docs, CI, module
+  structure and commit-message quality.
 
 Every threshold, and the reasoning behind it, is documented in
 `.claude/skills/participant-progress/reference/signals.md` and lives in one
@@ -71,7 +91,10 @@ Every threshold, and the reasoning behind it, is documented in
 
 Ordered most-urgent-first, grouped by status:
 
-1. **Status** — On track / Watch / Needs intervention.
+1. **Status** — On track / Watch / Needs intervention, alongside a
+   `HAS README` / `NO README` pill and a `DEEP` / `MEDIUM` / `LIGHT`
+   depth-of-thinking pill. Neither pill changes the status — they describe the
+   work, not whether someone is stuck.
 2. **Evidence** — 2–4 concrete bullets ("No commits in 11 days — prior 14-day
    window had 18 commits"), not a restated score. On-track participants get a
    single line.

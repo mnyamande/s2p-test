@@ -25,6 +25,15 @@ NOW = datetime.now(timezone.utc)
 ORG = "test-cohort"
 
 
+def _blob_size(path):
+    """Deterministic pretend file sizes so LOC estimates are stable across runs."""
+    if path.lower().startswith("readme"):
+        return 2400
+    if path == "CLAUDE.md":
+        return 1800
+    return 1280
+
+
 def ago(days=0, hours=0, minutes=0):
     return NOW - timedelta(days=days, hours=hours, minutes=minutes)
 
@@ -152,7 +161,14 @@ class FakeGitHub:
         if m:
             entry = self.db.get(m.group(1))
             return {"truncated": False,
-                    "tree": [{"path": p, "type": "blob"} for p in entry["paths"]]}
+                    "tree": [{"path": p, "type": "blob", "size": _blob_size(p),
+                              "sha": "b" + str(abs(hash(p)) % 10 ** 8)}
+                             for p in entry["paths"]]}
+        m = re.match(r"^/repos/([^/]+/[^/]+)/git/blobs/", path)
+        if m:
+            import base64
+            body = ("line\n" * 40).encode()
+            return {"encoding": "base64", "content": base64.b64encode(body).decode()}
         if "/commits" in path or "/actions/runs" in path:
             return self.paginate(path, params, accept_missing=accept_missing)
         return None
@@ -266,9 +282,25 @@ def run():
                 if not 1 <= len(entry["evidence"]) <= 4:
                     failures.append("brevity: %s has %d evidence bullets" % (name, len(entry["evidence"])))
 
+        # -- new-in-v1.1 surfaces: LOC, README pill, depth pill
+        ada = by_name.get("Ada Lovelace") or {}
+        if (ada.get("depth") or {}).get("level") != "DEEP":
+            failures.append("depth: Ada Lovelace expected DEEP, got %r"
+                            % (ada.get("depth") or {}).get("level"))
+        margaret = by_name.get("Margaret Hamilton") or {}
+        if margaret.get("has_readme") is not False:
+            failures.append("readme: Margaret Hamilton has no README file but flag is %r"
+                            % margaret.get("has_readme"))
+        for name, entry in by_name.items():
+            if entry.get("loc") is None:
+                failures.append("loc: %s has no line count" % name)
+            if not (entry.get("depth") or {}).get("level"):
+                failures.append("depth: %s has no depth level" % name)
+
         md = open(out_md).read()
         for needle in ["# Cohort progress", "## Needs intervention", "**Angle:**",
-                       "monitored for progress support"]:
+                       "monitored for progress support", "lines of code",
+                       "**HAS README**", "**NO README**", "**DEEP**"]:
             if needle not in md:
                 failures.append("markdown: missing %r" % needle)
         if "Sofia Ferrari" not in md:
@@ -278,11 +310,25 @@ def run():
 
         html_out = open(out_html).read()
         for needle in ["<!doctype html>", "prefers-color-scheme", "class='card intervene'",
-                       "Cohort progress"]:
+                       "Cohort progress", "linear-gradient", "lines of code",
+                       ">HAS README<", ">NO README<", "class='chip deep'"]:
             if needle not in html_out:
                 failures.append("html: missing %r" % needle)
         if html_out.count("<div") != html_out.count("</div>"):
             failures.append("html: unbalanced <div> tags")
+
+        # -- exact LOC mode counts real blob lines rather than estimating
+        out_json3 = os.path.join(tmp, "report3.json")
+        scan.main(["--org", ORG, "--days", "14", "--loc-mode", "exact", "--no-snapshot",
+                   "--data-dir", os.path.join(tmp, "data-x"), "--out", out_json3])
+        exact = json.load(open(out_json3))
+        ada3 = next((e for e in exact["participants"] if e["participant"] == "Ada Lovelace"), {})
+        if not ada3.get("loc_exact"):
+            failures.append("loc: --loc-mode exact did not mark counts as exact")
+        # 2 code files (src/a.py, tests/test_a.py) x 40 lines; README.md and
+        # CLAUDE.md are docs, not code, so they are excluded by design.
+        if ada3.get("loc") != 80:
+            failures.append("loc: exact count expected 80, got %r" % ada3.get("loc"))
 
         # -- second run: snapshot diffing
         snap = os.path.join(tmp, "data", ORG, "latest.json")

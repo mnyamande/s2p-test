@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Per-repo signal collection. Read-only: every call here is a GET."""
 
+import base64
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -11,6 +12,29 @@ TEST_RE = re.compile(
     re.I,
 )
 CI_PATH_RE = re.compile(r"^\.github/workflows/.+\.ya?ml$", re.I)
+DOC_RE = re.compile(r"\.(md|rst|adoc)$", re.I)
+
+# Directories that hold code someone else wrote — never counted as the
+# participant's own work.
+VENDOR_RE = re.compile(
+    r"(^|/)(node_modules|vendor|third_party|dist|build|out|target|\.venv|venv|"
+    r"site-packages|__pycache__|\.next|\.nuxt|coverage|migrations/versions)/", re.I)
+LOCKFILE_RE = re.compile(
+    r"(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|"
+    r"Gemfile\.lock|Cargo\.lock|composer\.lock|go\.sum)$", re.I)
+MINIFIED_RE = re.compile(r"\.min\.(js|css)$|\.bundle\.js$", re.I)
+
+# Average bytes per line, used to estimate line counts from blob sizes without
+# fetching every file. Rough by design — see reference/signals.md.
+BYTES_PER_LINE = {
+    "py": 32, "js": 34, "jsx": 34, "ts": 34, "tsx": 34, "mjs": 34, "cjs": 34,
+    "java": 33, "kt": 32, "scala": 34, "go": 30, "rb": 28, "rs": 32, "php": 32,
+    "c": 30, "h": 28, "cpp": 32, "hpp": 30, "cs": 33, "swift": 32, "m": 30,
+    "sh": 30, "bash": 30, "zsh": 30, "ps1": 32, "sql": 30, "r": 30,
+    "html": 40, "css": 28, "scss": 28, "less": 28, "vue": 34, "svelte": 34,
+    "tf": 30, "dockerfile": 30, "makefile": 26,
+}
+DEFAULT_BYTES_PER_LINE = 32
 
 
 def iso(dt):
@@ -29,7 +53,7 @@ def parse_ts(value):
             return None
 
 
-def collect_repo(gh, full_name, since, until, max_commit_details=40):
+def collect_repo(gh, full_name, since, until, max_commit_details=40, loc_mode="estimate"):
     """Gather every raw signal for one repo. Never raises for a single bad repo."""
     owner, name = full_name.split("/", 1)
     base = "/repos/%s/%s" % (owner, name)
@@ -58,7 +82,23 @@ def collect_repo(gh, full_name, since, until, max_commit_details=40):
     out["tree"] = _tree(gh, base, out["default_branch"])
     out["actions"] = _actions(gh, base, since)
     out["claude_md"] = _claude_md_history(gh, base, out["tree"])
+    out["loc"] = _loc(gh, base, out["tree"], loc_mode)
     return out
+
+
+def _loc(gh, base, tree, mode):
+    info = {"mode": mode, "lines": None, "exact": False,
+            "code_files": tree.get("code_file_count", 0), "partial": False}
+    if mode == "off" or not tree.get("available"):
+        return info
+    if mode == "exact":
+        lines, counted, skipped = exact_loc(gh, base, tree.get("code_files") or [])
+        info.update({"lines": lines, "exact": True, "counted_files": counted,
+                     "partial": bool(skipped) or bool(tree.get("truncated"))})
+        return info
+    info["lines"] = tree.get("loc_estimate", 0)
+    info["partial"] = bool(tree.get("truncated"))
+    return info
 
 
 def _commits(gh, base, since, until, max_details):
@@ -127,23 +167,44 @@ def _recent_history(gh, base):
     return info
 
 
+def _ext_of(path):
+    name = path.rsplit("/", 1)[-1].lower()
+    if name in ("makefile", "dockerfile"):
+        return name
+    return name.rsplit(".", 1)[-1] if "." in name else ""
+
+
+def _is_code(path):
+    if VENDOR_RE.search(path) or LOCKFILE_RE.search(path) or MINIFIED_RE.search(path):
+        return False
+    return _ext_of(path) in BYTES_PER_LINE
+
+
 def _tree(gh, base, branch):
     info = {
         "file_count": 0, "has_readme": False, "test_paths": [], "has_tests": False,
         "has_claude_md": False, "claude_dir_paths": [], "workflow_paths": [],
         "truncated": False, "available": False,
+        "readme_bytes": 0, "doc_count": 0, "top_level_dirs": [],
+        "code_files": [], "code_file_count": 0, "loc_estimate": 0,
     }
     tree = gh.get(base + "/git/trees/" + branch, {"recursive": "1"}, accept_missing=True)
     if not tree or "tree" not in tree:
         return info
     info["available"] = True
     info["truncated"] = bool(tree.get("truncated"))
-    paths = [n["path"] for n in tree["tree"] if n.get("type") == "blob"]
-    info["file_count"] = len(paths)
-    for path in paths:
+    blobs = [n for n in tree["tree"] if n.get("type") == "blob"]
+    info["file_count"] = len(blobs)
+    dirs, est = set(), 0.0
+    for node in blobs:
+        path = node["path"]
+        size = node.get("size") or 0
+        if "/" in path:
+            dirs.add(path.split("/", 1)[0])
         if "/" not in path and README_RE.match(path):
             info["has_readme"] = True
-        if TEST_RE.search(path):
+            info["readme_bytes"] = size
+        if TEST_RE.search(path) and not VENDOR_RE.search(path):
             info["test_paths"].append(path)
         if path == "CLAUDE.md" or path.endswith("/CLAUDE.md"):
             info["has_claude_md"] = True
@@ -151,9 +212,45 @@ def _tree(gh, base, branch):
             info["claude_dir_paths"].append(path)
         if CI_PATH_RE.match(path):
             info["workflow_paths"].append(path)
+        if DOC_RE.search(path) and not VENDOR_RE.search(path) and not README_RE.match(path):
+            info["doc_count"] += 1
+        if _is_code(path):
+            info["code_files"].append({"path": path, "sha": node.get("sha"), "size": size})
+            est += size / float(BYTES_PER_LINE.get(_ext_of(path), DEFAULT_BYTES_PER_LINE))
     info["has_tests"] = bool(info["test_paths"])
     info["test_paths"] = info["test_paths"][:8]
+    info["top_level_dirs"] = sorted(d for d in dirs if not d.startswith("."))
+    info["code_file_count"] = len(info["code_files"])
+    info["loc_estimate"] = int(round(est))
     return info
+
+
+def exact_loc(gh, base, code_files, max_files=250, max_bytes=400000):
+    """Count real lines by fetching blobs. Returns (lines, counted, skipped)."""
+    counted, skipped, total = 0, 0, 0
+    for entry in code_files:
+        if counted >= max_files:
+            skipped += 1
+            continue
+        if (entry.get("size") or 0) > max_bytes or not entry.get("sha"):
+            skipped += 1
+            continue
+        blob = gh.get(base + "/git/blobs/" + entry["sha"], accept_missing=True)
+        if not blob or blob.get("encoding") != "base64":
+            skipped += 1
+            continue
+        try:
+            raw = base64.b64decode(blob.get("content") or "")
+            text = raw.decode("utf-8", "replace")
+        except (ValueError, TypeError):
+            skipped += 1
+            continue
+        if "\x00" in text[:2000]:  # binary that slipped through the extension filter
+            skipped += 1
+            continue
+        total += text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+        counted += 1
+    return total, counted, skipped
 
 
 def _actions(gh, base, since):
