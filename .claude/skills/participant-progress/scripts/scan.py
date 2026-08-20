@@ -135,7 +135,7 @@ BLOCKED_HINT = (
 )
 
 
-def list_org_repos(gh, org, include_forks=False, include_archived=False):
+def list_org_repos(gh, org, include_forks=False, include_archived=False, exclude=None):
     try:
         repos = gh.paginate("/orgs/%s/repos" % org, {"type": "all", "sort": "pushed"})
     except GitHubError as exc:
@@ -154,6 +154,9 @@ def list_org_repos(gh, org, include_forks=False, include_archived=False):
     kept, skipped = [], 0
     for repo in repos:
         if repo["name"] in SKIP_REPOS:
+            skipped += 1
+            continue
+        if exclude and exclude.search(repo["name"]):
             skipped += 1
             continue
         if repo.get("fork") and not include_forks:
@@ -270,6 +273,8 @@ def build_parser():
     ap.add_argument("--loc-mode", choices=("estimate", "exact", "off"), default="estimate",
                     help="lines of code: estimate from blob sizes (free, default), "
                          "exact (one API call per code file), or off")
+    ap.add_argument("--exclude", help="regex of repo names to skip during org enumeration, "
+                                     "e.g. shared/template repos that aren't anyone's work")
     ap.add_argument("--include-forks", action="store_true")
     ap.add_argument("--include-archived", action="store_true")
     ap.add_argument("--no-gh", action="store_true", help="force the REST backend")
@@ -307,7 +312,9 @@ def main(argv=None):
                 deduped.append(name)
         repo_names = deduped
     else:
-        repo_names, skipped = list_org_repos(gh, args.org, args.include_forks, args.include_archived)
+        exclude_re = re.compile(args.exclude, re.I) if args.exclude else None
+        repo_names, skipped = list_org_repos(gh, args.org, args.include_forks,
+                                             args.include_archived, exclude_re)
     if args.max_repos:
         repo_names = repo_names[:args.max_repos]
     if not repo_names:
