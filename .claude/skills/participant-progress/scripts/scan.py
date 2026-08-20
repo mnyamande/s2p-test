@@ -92,9 +92,21 @@ def _absorb_row(row, by_repo, by_handle):
         return
     record = {"participant": name or handle, "handle": handle}
     if repo:
-        by_repo[repo.split("/")[-1].lower()] = record
+        record["repo"] = repo.split("/")[-1]
+        by_repo[record["repo"].lower()] = record
     if handle:
         by_handle[handle.lower()] = record
+
+
+def repos_from_roster(path, org):
+    """Repo list taken from a roster CSV/JSON's repo column."""
+    by_repo, _ = load_roster(path)
+    out = []
+    for record in by_repo.values():
+        name = record.get("repo")
+        if name:
+            out.append(name if "/" in name else "%s/%s" % (org, name))
+    return sorted(set(out), key=str.lower)
 
 
 def pattern_to_regex(pattern):
@@ -251,8 +263,10 @@ def build_parser():
     ap.add_argument("--org", default=DEFAULT_ORG, help="GitHub org (default: %s)" % DEFAULT_ORG)
     ap.add_argument("--repos", help="comma-separated owner/name list; skips org enumeration")
     ap.add_argument("--repos-from", dest="repos_from",
-                    help="file with one owner/name per line (# comments allowed); "
-                         "use this when org-wide listing is blocked, e.g. in a cloud session")
+                    help="scan exactly these repos instead of enumerating the org. "
+                         "Either a .csv/.json roster (its repo column is the list) or a "
+                         "text file with one owner/name per line. Use this when org-wide "
+                         "listing is blocked, e.g. in a cloud session")
     ap.add_argument("--pattern", default=DEFAULT_PATTERN,
                     help="repo naming convention (default: %s)" % DEFAULT_PATTERN)
     ap.add_argument("--no-pattern", action="store_true", help="disable convention matching")
@@ -299,12 +313,15 @@ def main(argv=None):
         if args.repos_from:
             if not os.path.exists(args.repos_from):
                 raise SystemExit("repo list file not found: %s" % args.repos_from)
-            with open(args.repos_from) as fh:
-                for line in fh:
-                    line = line.split("#", 1)[0].strip()
-                    if not line:
-                        continue
-                    repo_names.append(line if "/" in line else "%s/%s" % (args.org, line))
+            if args.repos_from.lower().endswith((".csv", ".tsv", ".json")):
+                repo_names += repos_from_roster(args.repos_from, args.org)
+            else:
+                with open(args.repos_from) as fh:
+                    for line in fh:
+                        line = line.split("#", 1)[0].strip()
+                        if not line:
+                            continue
+                        repo_names.append(line if "/" in line else "%s/%s" % (args.org, line))
         seen, deduped = set(), []
         for name in repo_names:
             if name not in seen:

@@ -85,9 +85,13 @@ list:
 python3 scan.py --org agentic-ai-coop --repos-from cohort-repos.txt --md /tmp/cohort.md
 ```
 
-`--repos-from` takes one `owner/name` (or bare repo name) per line, `#`
-comments allowed. Running from your own terminal, where `gh` is unrestricted,
-needs none of this.
+`--repos-from` accepts either a roster CSV — its repo column becomes the list,
+so one file drives both which repos are scanned and what the participants are
+called — or a plain text file with one `owner/name` per line. Running from your
+own terminal, where `gh` is unrestricted, needs none of this.
+
+For the agentic-ai-coop cohort both files are already committed; see
+`cohort/README.md` for the exact commands.
 
 Auth: the script uses `gh` if it is installed and `gh auth status` passes,
 otherwise `GH_TOKEN` / `GITHUB_TOKEN`. It needs read access to the org.
@@ -126,7 +130,24 @@ matters when it stays light while commit volume climbs — that is someone
 generating code without building understanding around it, which is worth a
 conversation even though nothing here is a struggle signal.
 
-## 5. Tuning
+## 5. Filling in GitHub handles
+
+Handles cannot be read from the roster alone — they come from each repo's
+commit authors. `scripts/fill_handles.py` resolves them and writes them back
+into the CSV:
+
+```bash
+python3 scripts/fill_handles.py --org agentic-ai-coop \
+  --csv ../../../cohort/roster.csv --facilitator mnyamande
+```
+
+It skips bot accounts, deprioritises the facilitator's own handle where another
+human authored the repo, fills only blank cells (so re-runs never clobber a
+manual fix), and leaves anything ambiguous blank with a note rather than
+guessing. It must run somewhere the org is reachable — a cloud session cannot
+read repos it has not attached.
+
+## 6. Tuning
 
 Thresholds live in one dict, `THRESHOLDS` at the top of `scripts/analyze.py`
 (see `reference/signals.md` for what each one means and why it is set where it
@@ -140,7 +161,7 @@ It builds a synthetic cohort covering every signal, runs the real pipeline over
 it, and asserts the statuses, evidence, ordering, and run-over-run diffing all
 come out right. It needs no network and no credentials.
 
-## 6. Snapshots
+## 7. Snapshots
 
 Each run writes `data/<org>/latest.json` plus a timestamped copy in
 `data/<org>/runs/`. The next run diffs against `latest.json` to report change
@@ -148,7 +169,7 @@ Each run writes `data/<org>/latest.json` plus a timestamped copy in
 rather than just a static picture. Snapshots are gitignored — they are local
 state, and they contain participant activity data.
 
-## 7. Guardrails
+## 8. Guardrails
 
 - Read-only, always. Never add a write call to these scripts.
 - **Tell the cohort their repos are monitored for progress support.** The

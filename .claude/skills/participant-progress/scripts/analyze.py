@@ -528,6 +528,9 @@ def summarise_participant(name, handle, repo_results, prev_participant=None):
                 daily[i] += value
 
     primary = repo_results[0]["metrics"] if repo_results else {}
+    # A repo we could not read tells us nothing about its README or depth —
+    # report "unknown" by omitting the pills rather than asserting the worst.
+    unreadable = any(r.get("error") for r in repo_results)
     loc_values = [r["metrics"].get("loc") for r in repo_results
                   if r["metrics"].get("loc") is not None]
     depths = [r["metrics"].get("depth") for r in repo_results if r["metrics"].get("depth")]
@@ -539,8 +542,9 @@ def summarise_participant(name, handle, repo_results, prev_participant=None):
         "loc": sum(loc_values) if loc_values else None,
         "loc_exact": all(r["metrics"].get("loc_exact") for r in repo_results),
         "loc_partial": any(r["metrics"].get("loc_partial") for r in repo_results),
-        "has_readme": all(r["metrics"].get("has_readme") for r in repo_results),
-        "depth": best_depth,
+        "has_readme": None if unreadable else all(r["metrics"].get("has_readme")
+                                                  for r in repo_results),
+        "depth": None if unreadable else best_depth,
         "handle": handle,
         "repos": [r["repo"] for r in repo_results],
         "urls": [r.get("html_url") for r in repo_results],
