@@ -1,0 +1,26 @@
+# agentic-ai-coop roster — overrides for repos the s2p-firstname-lastname
+# convention gets wrong. Every other repo maps correctly from its name alone,
+# so only exceptions belong here.
+#
+# Use with: scan.py --org agentic-ai-coop --roster cohort/roster.csv
+#
+# TWO ROWS NEED YOUR CONFIRMATION (marked CONFIRM below) — the repo name does
+# not carry enough to identify the person.
+repo,participant,github handle
+# --- prefix typos: do not match the convention at all
+stp-pj-smit,PJ Smit,
+SP2-HvanHuyssteen_data-strategy,Henk van Huyssteen,
+# --- Afrikaans/Dutch surname particles: convention capitalises them wrongly
+s2p-henk-van-huyssteen,Henk van Huyssteen,
+s2p-pieter-vanniekerk,Pieter van Niekerk,
+s2p-gerhard-vandermerwe,Gerhard van der Merwe,
+s2p-andries-vandenberg,Andries van den Berg,
+s2p-carel-vdMerwe,Carel van der Merwe,
+s2p-lilienne-vdmerwe,Lilienne van der Merwe,
+s2p-Simon-VanWyk,Simon van Wyk,
+s2p-Zak-vonGordon,Zak von Gordon,
+# --- trailing suffixes
+s2p-nemita-mithal1,Nemita Mithal,
+# --- CONFIRM: repo name does not identify the participant
+s2p-MyWordsmith,MyWordsmith (CONFIRM owner),
+s2p-Blesing_Wk2,Blesing (CONFIRM surname),
