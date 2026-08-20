@@ -54,6 +54,10 @@ python3 .claude/skills/participant-progress/scripts/fill_handles.py \
   --facilitator mnyamande
 ```
 
+The scripts run on Python 3.6 and newer with no packages to install. If your
+`python3` is older — some Anaconda installs still ship 3.6 or earlier — use the
+system one instead: `/usr/bin/python3 …`.
+
 It reads each repo's contributors, drops bot accounts (`claude`,
 `github-actions`, anything ending `[bot]`), and writes the most prolific human
 author into the handle column. `--facilitator mnyamande` deprioritises your own

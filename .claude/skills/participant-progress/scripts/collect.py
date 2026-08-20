@@ -41,16 +41,38 @@ def iso(dt):
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+TS_OFFSET_RE = re.compile(r"([+-])(\d{2}):?(\d{2})$")
+TS_FRACTION_RE = re.compile(r"\.\d+$")
+TS_FORMATS = ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d")
+
+
 def parse_ts(value):
+    """Parse a GitHub timestamp or a --since/--until argument into aware UTC.
+
+    Hand-rolled rather than leaning on the ISO parsing helper added in Python
+    3.7, or on %z accepting a colon in the offset (also 3.7), so this runs on
+    3.6 as well.
+    """
     if not value:
         return None
-    try:
-        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    except ValueError:
+    text = value.strip()
+    offset_minutes = 0
+    match = TS_OFFSET_RE.search(text)
+    if match and "T" in text:
+        sign = 1 if match.group(1) == "+" else -1
+        offset_minutes = sign * (int(match.group(2)) * 60 + int(match.group(3)))
+        text = text[:match.start()]
+    if text.endswith("Z"):
+        text = text[:-1]
+    text = TS_FRACTION_RE.sub("", text)
+    for fmt in TS_FORMATS:
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.strptime(text, fmt)
         except ValueError:
-            return None
+            continue
+        parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed - timedelta(minutes=offset_minutes) if offset_minutes else parsed
+    return None
 
 
 def collect_repo(gh, full_name, since, until, max_commit_details=40, loc_mode="estimate"):

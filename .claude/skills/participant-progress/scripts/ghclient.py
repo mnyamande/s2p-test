@@ -55,7 +55,8 @@ class GitHub:
         try:
             proc = subprocess.run(
                 [self.gh_path, "auth", "status"],
-                capture_output=True, text=True, timeout=20,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                universal_newlines=True, timeout=20,
             )
             return proc.returncode == 0
         except (OSError, subprocess.SubprocessError):
@@ -131,7 +132,8 @@ class GitHub:
     def _request_gh(self, url):
         endpoint = url[len(API_ROOT):] if url.startswith(API_ROOT) else url
         cmd = [self.gh_path, "api", "-H", "Accept: application/vnd.github+json", endpoint]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              universal_newlines=True, timeout=90)
         if proc.returncode != 0:
             stderr = (proc.stderr or "").strip()
             status = None

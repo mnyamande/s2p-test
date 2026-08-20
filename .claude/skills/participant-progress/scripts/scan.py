@@ -12,6 +12,16 @@ Repo -> participant mapping, in priority order:
   3. otherwise the repo name is used as-is and flagged as inferred in the report
 """
 
+import sys
+
+if sys.version_info < (3, 6):
+    sys.stderr.write(
+        "This script needs Python 3.6 or newer (found %d.%d). On macOS, "
+        "/usr/bin/python3 is usually current:\n"
+        "  /usr/bin/python3 %s ...\n" % (sys.version_info[0], sys.version_info[1],
+                                         sys.argv[0] if sys.argv else "script.py"))
+    raise SystemExit(1)
+
 import argparse
 import csv
 import io

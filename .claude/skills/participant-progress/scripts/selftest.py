@@ -222,10 +222,50 @@ EXPECTED = {
 }
 
 
+# Constructs that need a newer Python than this project supports. Anaconda
+# still ships 3.6 on plenty of Macs, and a scan that dies on import is worse
+# than one that runs a little conservatively.
+BANNED = {
+    "capture_output=": "subprocess capture_output is 3.7+; use stdout/stderr=PIPE",
+    "text=True": "subprocess text= is 3.7+; use universal_newlines=True",
+    "fromisoformat": "datetime.fromisoformat is 3.7+; use collect.parse_ts",
+    "breakpoint(": "breakpoint() is 3.7+",
+    ":=": "walrus operator is 3.8+",
+}
+MIN_PYTHON = (3, 6)
+
+
+def check_compat():
+    """Fail if any shipped script uses something older Pythons cannot run."""
+    problems = []
+    here = os.path.dirname(os.path.abspath(__file__))
+    for name in sorted(os.listdir(here)):
+        if not name.endswith(".py") or name == os.path.basename(__file__):
+            continue
+        with open(os.path.join(here, name)) as fh:
+            for lineno, line in enumerate(fh, 1):
+                code = line.split("#", 1)[0]
+                for needle, why in BANNED.items():
+                    if needle in code:
+                        problems.append("%s:%d %s" % (name, lineno, why))
+    # parse_ts must handle every timestamp shape we feed it, on any version.
+    from collect import parse_ts
+    for raw, want in [("2026-08-20T12:34:56Z", "2026-08-20 12:34:56+00:00"),
+                      ("2026-08-20T14:34:56+02:00", "2026-08-20 12:34:56+00:00"),
+                      ("2026-08-20T12:34:56.123Z", "2026-08-20 12:34:56+00:00"),
+                      ("2026-08-20", "2026-08-20 00:00:00+00:00"),
+                      ("nonsense", None)]:
+        got = parse_ts(raw)
+        if (str(got) if got else None) != want:
+            problems.append("parse_ts(%r) -> %s, expected %s" % (raw, got, want))
+    return problems
+
+
 def run():
+    failures_compat = check_compat()
     db = build_cohort()
     tmp = tempfile.mkdtemp(prefix="pp-selftest-")
-    failures = []
+    failures = list(failures_compat)
     try:
         roster = os.path.join(tmp, "roster.csv")
         with open(roster, "w") as fh:
@@ -357,8 +397,9 @@ def run():
         for f in failures:
             print("  - %s" % f)
         return 1
-    print("SELFTEST PASSED — %d participants, statuses/evidence/ordering/diffing all as expected"
-          % len(EXPECTED))
+    print("SELFTEST PASSED — %d participants, statuses/evidence/ordering/diffing all as "
+          "expected; sources clean for Python %d.%d+"
+          % (len(EXPECTED), MIN_PYTHON[0], MIN_PYTHON[1]))
     return 0
 
 
