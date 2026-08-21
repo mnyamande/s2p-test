@@ -351,7 +351,8 @@ def run():
         html_out = open(out_html).read()
         for needle in ["<!doctype html>", "prefers-color-scheme", "class='card intervene'",
                        "Cohort progress", "linear-gradient", "lines of code",
-                       ">HAS README<", ">NO README<", "class='chip deep'"]:
+                       ">HAS README<", ">NO README<", "class='chip deep'",
+                       "report format v"]:
             if needle not in html_out:
                 failures.append("html: missing %r" % needle)
         if html_out.count("<div") != html_out.count("</div>"):

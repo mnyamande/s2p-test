@@ -5,6 +5,11 @@ import html
 import json
 from datetime import datetime, timezone
 
+# Bumped whenever the report's visual design or fields change, and printed in
+# the footer — so "this looks different from what I saw" is answerable by
+# reading the file rather than guessing which build produced it.
+REPORT_VERSION = "1.2"
+
 STATUS_ORDER = ["Needs intervention", "Watch", "On track"]
 STATUS_KEY = {"Needs intervention": "intervene", "Watch": "watch", "On track": "ontrack"}
 PRIVACY_NOTE = (
@@ -141,6 +146,7 @@ def to_markdown(report):
         notes.append("skipped %d (archived/forks/empty)" % meta["repos_skipped"])
     notes.append("%d API call%s" % (meta.get("api_calls", 0), "" if meta.get("api_calls") == 1 else "s"))
     notes.append("via `%s`" % meta.get("backend", "rest"))
+    notes.append("report format v%s" % REPORT_VERSION)
     out.append("_%s._" % " · ".join(notes))
     out.append("")
     snap = meta.get("snapshot_path", "n/a")
@@ -313,6 +319,7 @@ def to_html(report):
         notes.append("skipped %d (archived/forks/empty)" % meta["repos_skipped"])
     notes.append("%d API calls via %s" % (meta.get("api_calls", 0), meta.get("backend", "rest")))
     notes.append("generated %s" % datetime.now(timezone.utc).strftime("%b %-d %H:%M UTC"))
+    notes.append("report format v%s" % REPORT_VERSION)
     p.append("<footer><div>%s.</div>" % esc(" · ".join(notes)))
     p.append("<div>Snapshot: <code>%s</code></div>" % esc(meta.get("snapshot_path", "n/a")))
     p.append("<div class='note'><b>Note:</b> %s</div></footer>" % esc(PRIVACY_NOTE))
