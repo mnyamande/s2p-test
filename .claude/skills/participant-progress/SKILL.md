@@ -96,7 +96,33 @@ For the agentic-ai-coop cohort both files are already committed; see
 Auth: the script uses `gh` if it is installed and `gh auth status` passes,
 otherwise `GH_TOKEN` / `GITHUB_TOKEN`. It needs read access to the org.
 
-## 3. Present the briefing in-session
+## 3. Never hand-write the report
+
+`scripts/render.py` produces both the Markdown and the HTML. **Do not write
+your own HTML briefing, and do not restyle the generated one.** If a report is
+wanted in a different shape, change `render.py` and re-run — never compose a
+one-off page alongside it.
+
+This matters more than it looks. A hand-rolled page is a different design every
+run, cannot be diffed against the last one, drops the evidence bullets in
+favour of prose, and quietly loses the signals the scan worked to collect —
+lines of code, the README and depth pills, the per-day sparkline, the
+run-over-run change notes. The facilitator has agreed a format; reproducing it
+exactly is the point.
+
+Check the footer of any report you present: it must read
+`report format v<version>`. If it does not, it did not come from `render.py`.
+
+To share the report, publish the file `render.py` generated:
+
+```bash
+python3 scan.py --org agentic-ai-coop --roster ../../../cohort/roster.csv \
+  --html /tmp/cohort.html --out /tmp/cohort.json
+```
+
+then publish `/tmp/cohort.html` as-is. Publishing is fine; rewriting is not.
+
+## 4. Present the briefing in-session
 
 Print the Markdown report to the facilitator directly — that is the
 deliverable. Then:
@@ -113,7 +139,7 @@ You may add judgement the script cannot have — e.g. "Jane's stall lines up
 with the week she flagged travel." Do not soften or drop a flagged signal; the
 evidence bullets are the point.
 
-## 4. What the pills mean
+## 5. What the pills mean
 
 Each participant carries up to three pills next to their name:
 
@@ -130,7 +156,7 @@ matters when it stays light while commit volume climbs — that is someone
 generating code without building understanding around it, which is worth a
 conversation even though nothing here is a struggle signal.
 
-## 5. Filling in GitHub handles
+## 6. Filling in GitHub handles
 
 Handles cannot be read from the roster alone — they come from each repo's
 commit authors. `scripts/fill_handles.py` resolves them and writes them back
@@ -147,7 +173,7 @@ manual fix), and leaves anything ambiguous blank with a note rather than
 guessing. It must run somewhere the org is reachable — a cloud session cannot
 read repos it has not attached.
 
-## 6. Tuning
+## 7. Tuning
 
 Thresholds live in one dict, `THRESHOLDS` at the top of `scripts/analyze.py`
 (see `reference/signals.md` for what each one means and why it is set where it
@@ -161,7 +187,7 @@ It builds a synthetic cohort covering every signal, runs the real pipeline over
 it, and asserts the statuses, evidence, ordering, and run-over-run diffing all
 come out right. It needs no network and no credentials.
 
-## 7. Snapshots
+## 8. Snapshots
 
 Each run writes `data/<org>/latest.json` plus a timestamped copy in
 `data/<org>/runs/`. The next run diffs against `latest.json` to report change
@@ -169,9 +195,11 @@ Each run writes `data/<org>/latest.json` plus a timestamped copy in
 rather than just a static picture. Snapshots are gitignored — they are local
 state, and they contain participant activity data.
 
-## 8. Guardrails
+## 9. Guardrails
 
 - Read-only, always. Never add a write call to these scripts.
+- The report is `render.py`'s output, verbatim. Never hand-author a briefing
+  page; change the renderer instead.
 - **Tell the cohort their repos are monitored for progress support.** The
   report carries this reminder in its footer; the tool notifies nobody itself.
 - This is coaching signal, not evaluation. Commit counts measure activity, not
